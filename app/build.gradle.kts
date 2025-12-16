@@ -6,6 +6,17 @@ plugins {
     // id("com.google.gms.google-services") // Comentado - usando Room en lugar de Firebase
 }
 
+// Leer propiedades del keystore si existe
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+val keystoreProperties = java.util.Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(java.io.FileInputStream(keystorePropertiesFile))
+}
+
+// Leer versionCode y versionName desde variables de entorno o usar valores por defecto
+val versionCodeEnv = System.getenv("VERSION_CODE")?.toIntOrNull()
+val versionNameEnv = System.getenv("VERSION_NAME")
+
 android {
     namespace = "com.example.howyouknow"
     compileSdk {
@@ -16,14 +27,31 @@ android {
         applicationId = "com.example.howyouknow"
         minSdk = 28
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = versionCodeEnv ?: 1
+        versionName = versionNameEnv ?: "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         
         // Configuración para soporte de 16 KB page size
         ndk {
             abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+        }
+    }
+
+    signingConfigs {
+        create("release") {
+            if (keystorePropertiesFile.exists()) {
+                keyAlias = keystoreProperties["keyAlias"] as String?
+                keyPassword = keystoreProperties["keyPassword"] as String?
+                storeFile = keystoreProperties["storeFile"]?.let { file(it) }
+                storePassword = keystoreProperties["storePassword"] as String?
+            } else {
+                // Para CI/CD, usar variables de entorno
+                keyAlias = System.getenv("KEY_ALIAS")
+                keyPassword = System.getenv("KEY_PASSWORD")
+                storeFile = System.getenv("KEYSTORE_FILE")?.let { file(it) }
+                storePassword = System.getenv("KEYSTORE_PASSWORD")
+            }
         }
     }
 
@@ -34,6 +62,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            if (keystorePropertiesFile.exists() || System.getenv("KEYSTORE_PASSWORD") != null) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
     compileOptions {
