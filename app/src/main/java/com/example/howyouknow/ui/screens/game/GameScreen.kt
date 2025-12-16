@@ -93,118 +93,118 @@ fun GameScreen(
             }
             // Juego activo
             uiState.currentQuestion != null -> {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-                    .padding(16.dp)
-            ) {
-                // Timer y progreso
-                Row(
+                Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 16.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                        .fillMaxSize()
+                        .padding(paddingValues)
+                        .padding(16.dp)
                 ) {
-                    val currentIndex = uiState.session?.currentQuestionIndex ?: 0
-                    val totalQuestions = uiState.questions.size
-                    Text(
-                        text = "Pregunta ${currentIndex + 1} de $totalQuestions",
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                    
-                    // Timer
-                    Card(
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (uiState.timeRemaining <= 10) {
-                                Color(0xFFFF5252) // Rojo cuando queda poco tiempo
-                            } else {
-                                MaterialTheme.colorScheme.primaryContainer
-                            }
-                        )
+                    // Timer y progreso
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "${uiState.timeRemaining}s",
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                            color = if (uiState.timeRemaining <= 10) Color.White else MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                    }
-                }
-                
-                LinearProgressIndicator(
-                    progress = { 
                         val currentIndex = uiState.session?.currentQuestionIndex ?: 0
                         val totalQuestions = uiState.questions.size
-                        (currentIndex + 1).toFloat() / totalQuestions 
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(8.dp)
-                        .padding(bottom = 24.dp)
-                )
-
-                // Pregunta
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 24.dp),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp)
-                    ) {
                         Text(
-                            text = uiState.currentQuestion!!.questionText,
-                            style = MaterialTheme.typography.titleLarge,
-                            modifier = Modifier.padding(bottom = 16.dp)
+                            text = "Pregunta ${currentIndex + 1} de $totalQuestions",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Bold
                         )
+                        
+                        // Timer
+                        Card(
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (uiState.timeRemaining <= 10) {
+                                    Color(0xFFFF5252) // Rojo cuando queda poco tiempo
+                                } else {
+                                    MaterialTheme.colorScheme.primaryContainer
+                                }
+                            )
+                        ) {
+                            Text(
+                                text = "${uiState.timeRemaining}s",
+                                style = MaterialTheme.typography.headlineMedium,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                color = if (uiState.timeRemaining <= 10) Color.White else MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                    }
+                    
+                    LinearProgressIndicator(
+                        progress = { 
+                            val currentIndex = uiState.session?.currentQuestionIndex ?: 0
+                            val totalQuestions = uiState.questions.size
+                            (currentIndex + 1).toFloat() / totalQuestions 
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(8.dp)
+                            .padding(bottom = 24.dp)
+                    )
 
-                        // Mostrar opciones según el tipo
-                        when (uiState.currentQuestion!!.questionType) {
-                            QuestionType.MULTIPLE_CHOICE,
-                            QuestionType.YES_NO -> {
-                                uiState.currentQuestion!!.options.forEach { option ->
-                                    AnswerOption(
-                                        text = option,
-                                        isSelected = uiState.selectedAnswer == option,
-                                        onClick = { viewModel.selectAnswer(option) }
+                    // Pregunta
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 24.dp),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp)
+                        ) {
+                            Text(
+                                text = uiState.currentQuestion!!.questionText,
+                                style = MaterialTheme.typography.titleLarge,
+                                modifier = Modifier.padding(bottom = 16.dp)
+                            )
+
+                            // Mostrar opciones según el tipo
+                            when (uiState.currentQuestion!!.questionType) {
+                                QuestionType.MULTIPLE_CHOICE,
+                                QuestionType.YES_NO -> {
+                                    uiState.currentQuestion!!.options.forEach { option ->
+                                        AnswerOption(
+                                            text = option,
+                                            isSelected = uiState.selectedAnswer == option,
+                                            onClick = { viewModel.selectAnswer(option) }
+                                        )
+                                    }
+                                }
+                                QuestionType.OPEN -> {
+                                    OpenAnswerInput(
+                                        onAnswerChange = { viewModel.selectAnswer(it) }
+                                    )
+                                }
+                                QuestionType.RANKING,
+                                QuestionType.SURVEY -> {
+                                    // Para ranking, mostrar opciones ordenables
+                                    Text(
+                                        text = "Funcionalidad de ranking próximamente",
+                                        style = MaterialTheme.typography.bodyMedium
                                     )
                                 }
                             }
-                            QuestionType.OPEN -> {
-                                OpenAnswerInput(
-                                    onAnswerChange = { viewModel.selectAnswer(it) }
-                                )
-                            }
-                            QuestionType.RANKING,
-                            QuestionType.SURVEY -> {
-                                // Para ranking, mostrar opciones ordenables
-                                Text(
-                                    text = "Funcionalidad de ranking próximamente",
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
-                            }
                         }
                     }
-                }
 
-                Spacer(modifier = Modifier.weight(1f))
+                    Spacer(modifier = Modifier.weight(1f))
 
-                // Botón enviar respuesta
-                Button(
-                    onClick = { viewModel.submitAnswer() },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                    enabled = uiState.selectedAnswer != null
-                ) {
-                    Text("Enviar Respuesta", style = MaterialTheme.typography.titleMedium)
+                    // Botón enviar respuesta
+                    Button(
+                        onClick = { viewModel.submitAnswer() },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp),
+                        enabled = uiState.selectedAnswer != null
+                    ) {
+                        Text("Enviar Respuesta", style = MaterialTheme.typography.titleMedium)
+                    }
                 }
-            }
         }
     }
 }
