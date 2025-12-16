@@ -1,5 +1,6 @@
 package com.example.howyouknow.ui.screens.results
 
+import android.content.Context
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -7,10 +8,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.howyouknow.data.repository.GameRepository
-import com.example.howyouknow.data.repository.QuestionRepository
+import com.example.howyouknow.data.repository.LocalGameRepository
+import com.example.howyouknow.data.repository.LocalQuestionRepository
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -19,8 +21,9 @@ fun ResultsScreen(
     sessionId: String,
     onNavigateBack: () -> Unit
 ) {
-    val gameRepository = remember { GameRepository() }
-    val questionRepository = remember { QuestionRepository() }
+    val context = LocalContext.current
+    val gameRepository = remember { LocalGameRepository(context) }
+    val questionRepository = remember { LocalQuestionRepository(context) }
     var session by remember { mutableStateOf<com.example.howyouknow.data.model.GameSession?>(null) }
     var questions by remember { mutableStateOf<List<com.example.howyouknow.data.model.Question>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
@@ -97,7 +100,7 @@ fun ResultsScreen(
                             modifier = Modifier.padding(top = 8.dp)
                         )
                         Text(
-                            text = "Comodines usados: ${session!!.comodinesUsed}/3",
+                            text = "Preguntas respondidas: ${session!!.answers.size}/${session!!.questionIds.size}",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onPrimaryContainer,
                             modifier = Modifier.padding(top = 8.dp)
@@ -213,25 +216,23 @@ private fun AnswerComparison(
 
             if (answer != null) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text(
-                        text = "Puntos: ${answer.pointsEarned}",
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                    if (answer.comodinUsed) {
+                    Column {
                         Text(
-                            text = "Comodín usado",
+                            text = "Puntos: ${answer.pointsEarned}",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.secondary
+                            fontWeight = FontWeight.Bold
                         )
-                    }
-                    if (answer.secondChanceUsed) {
+                        // Mostrar tiempo de respuesta
+                        val timeSeconds = (answer.timeSpent / 1000).toInt()
                         Text(
-                            text = "Segunda oportunidad",
+                            text = "Tiempo: ${timeSeconds}s",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.error
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                         )
                     }
                 }

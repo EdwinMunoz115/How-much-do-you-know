@@ -106,6 +106,9 @@ fun NavGraph(
                 onNavigateToPairing = {
                     navController.navigate(Screen.Pairing.route)
                 },
+                onNavigateToCreateQuestion = {
+                    navController.navigate(Screen.CreateQuestion.route)
+                },
                 hasPartner = hasPartner
             )
         }
@@ -114,9 +117,6 @@ fun NavGraph(
             val userId = authViewModel.getCurrentUserId() ?: ""
             ProfileScreen(
                 userId = userId,
-                onNavigateToCreateQuestion = {
-                    navController.navigate(Screen.CreateQuestion.route)
-                },
                 onNavigateToPairing = {
                     navController.navigate(Screen.Pairing.route)
                 },

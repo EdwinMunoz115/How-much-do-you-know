@@ -6,6 +6,7 @@ data class Answer(
     val isCorrect: Boolean = false,
     val pointsEarned: Int = 0,
     val comodinUsed: Boolean = false,
-    val secondChanceUsed: Boolean = false
+    val secondChanceUsed: Boolean = false,
+    val timeSpent: Long = 0 // Tiempo en milisegundos que tardó en responder
 )
 

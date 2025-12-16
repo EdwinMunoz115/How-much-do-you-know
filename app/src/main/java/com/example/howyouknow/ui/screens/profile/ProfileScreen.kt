@@ -19,7 +19,6 @@ import kotlinx.coroutines.launch
 @Composable
 fun ProfileScreen(
     userId: String,
-    onNavigateToCreateQuestion: () -> Unit,
     onNavigateToPairing: () -> Unit,
     onLogout: () -> Unit,
     authViewModel: AuthViewModel
@@ -154,19 +153,6 @@ fun ProfileScreen(
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
-
-                // Botones de acción
-                Button(
-                    onClick = onNavigateToCreateQuestion,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                    enabled = user?.partnerId != null
-                ) {
-                    Text("Crear Preguntas")
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
 
                 OutlinedButton(
                     onClick = {

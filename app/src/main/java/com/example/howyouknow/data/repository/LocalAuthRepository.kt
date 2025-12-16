@@ -127,7 +127,7 @@ class LocalAuthRepository(context: Context) {
     }
 
     private fun generateInvitationCode(): String {
-        return java.util.UUID.randomUUID().toString().take(8).uppercase()
+        return java.util.UUID.randomUUID().toString().substring(0, 6).uppercase()
     }
 }
 
