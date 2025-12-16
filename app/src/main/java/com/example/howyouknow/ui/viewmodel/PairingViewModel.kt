@@ -40,13 +40,23 @@ class PairingViewModel(application: Application) : AndroidViewModel(application)
                 val currentUser = authRepository.getCurrentUser()
                 if (currentUser != null) {
                     Log.d("PairingViewModel", "Usuario autenticado encontrado: ${currentUser.userId}, código: ${currentUser.invitationCode}")
+                    
+                    // Asegurar que el usuario tenga código de invitación
+                    userRepository.ensureInvitationCode(currentUser.userId)
+                    
                     val result = userRepository.getUser(currentUser.userId)
                     result.fold(
                         onSuccess = { user ->
-                            Log.d("PairingViewModel", "Usuario cargado exitosamente: ${user?.name}, código: ${user?.invitationCode}, pareja: ${user?.partnerId}")
+                            var finalUser = user
+                            // Si el usuario no tiene código o está vacío, usar el del LocalUser
+                            if (finalUser != null && (finalUser.invitationCode.isBlank() || finalUser.invitationCode.isEmpty())) {
+                                Log.w("PairingViewModel", "Usuario sin código de invitación, usando código del LocalUser")
+                                finalUser = finalUser.copy(invitationCode = currentUser.invitationCode)
+                            }
+                            Log.d("PairingViewModel", "Usuario cargado exitosamente: ${finalUser?.name}, código: ${finalUser?.invitationCode}, pareja: ${finalUser?.partnerId}")
                             _uiState.value = _uiState.value.copy(
-                                currentUser = user,
-                                isPaired = user?.partnerId != null
+                                currentUser = finalUser,
+                                isPaired = finalUser?.partnerId != null
                             )
                         },
                         onFailure = { exception ->
@@ -60,7 +70,10 @@ class PairingViewModel(application: Application) : AndroidViewModel(application)
                                     email = localUser.email,
                                     age = localUser.age,
                                     partnerId = localUser.partnerId,
-                                    invitationCode = localUser.invitationCode,
+                                    invitationCode = localUser.invitationCode.ifBlank { 
+                                        // Generar código si está vacío
+                                        java.util.UUID.randomUUID().toString().substring(0, 6).uppercase()
+                                    },
                                     totalPoints = localUser.totalPoints
                                 )
                                 _uiState.value = _uiState.value.copy(

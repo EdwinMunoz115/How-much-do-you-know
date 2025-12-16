@@ -29,5 +29,8 @@ interface UserDao {
 
     @Query("UPDATE users SET partnerId = :partnerId WHERE userId = :userId")
     suspend fun updatePartnerId(userId: String, partnerId: String?)
+
+    @Query("UPDATE users SET invitationCode = :code WHERE userId = :userId")
+    suspend fun updateInvitationCode(userId: String, code: String)
 }
 

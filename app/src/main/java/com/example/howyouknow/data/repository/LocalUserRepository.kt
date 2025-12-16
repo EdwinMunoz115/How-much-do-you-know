@@ -81,5 +81,21 @@ class LocalUserRepository(context: Context) {
             Result.failure(e)
         }
     }
+
+    suspend fun ensureInvitationCode(userId: String): Result<String> {
+        return try {
+            val userEntity = userDao.getUserById(userId)
+            if (userEntity != null && (userEntity.invitationCode.isBlank() || userEntity.invitationCode.isEmpty())) {
+                // Generar nuevo código si no existe
+                val newCode = java.util.UUID.randomUUID().toString().substring(0, 6).uppercase()
+                userDao.updateInvitationCode(userId, newCode)
+                Result.success(newCode)
+            } else {
+                Result.success(userEntity?.invitationCode ?: "")
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }
 
