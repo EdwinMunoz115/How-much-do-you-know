@@ -205,6 +205,7 @@ fun GameScreen(
                         Text("Enviar Respuesta", style = MaterialTheme.typography.titleMedium)
                     }
                 }
+            }
         }
     }
 }
