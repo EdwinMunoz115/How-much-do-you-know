@@ -1,6 +1,7 @@
 package com.example.howyouknow.ui.viewmodel
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.howyouknow.data.model.User
@@ -34,18 +35,46 @@ class PairingViewModel(application: Application) : AndroidViewModel(application)
 
     private fun loadCurrentUser() {
         viewModelScope.launch {
-            val currentUser = authRepository.getCurrentUser()
-            if (currentUser != null) {
-                val result = userRepository.getUser(currentUser.userId)
-                result.fold(
-                    onSuccess = { user ->
-                        _uiState.value = _uiState.value.copy(
-                            currentUser = user,
-                            isPaired = user?.partnerId != null
-                        )
-                    },
-                    onFailure = { }
-                )
+            try {
+                Log.d("PairingViewModel", "Cargando usuario actual...")
+                val currentUser = authRepository.getCurrentUser()
+                if (currentUser != null) {
+                    Log.d("PairingViewModel", "Usuario autenticado encontrado: ${currentUser.userId}, código: ${currentUser.invitationCode}")
+                    val result = userRepository.getUser(currentUser.userId)
+                    result.fold(
+                        onSuccess = { user ->
+                            Log.d("PairingViewModel", "Usuario cargado exitosamente: ${user?.name}, código: ${user?.invitationCode}, pareja: ${user?.partnerId}")
+                            _uiState.value = _uiState.value.copy(
+                                currentUser = user,
+                                isPaired = user?.partnerId != null
+                            )
+                        },
+                        onFailure = { exception ->
+                            Log.e("PairingViewModel", "Error al cargar usuario: ${exception.message}")
+                            // Si falla, usar el LocalUser directamente
+                            val localUser = authRepository.getCurrentUser()
+                            if (localUser != null) {
+                                val user = User(
+                                    userId = localUser.userId,
+                                    name = localUser.name,
+                                    email = localUser.email,
+                                    age = localUser.age,
+                                    partnerId = localUser.partnerId,
+                                    invitationCode = localUser.invitationCode,
+                                    totalPoints = localUser.totalPoints
+                                )
+                                _uiState.value = _uiState.value.copy(
+                                    currentUser = user,
+                                    isPaired = user.partnerId != null
+                                )
+                            }
+                        }
+                    )
+                } else {
+                    Log.w("PairingViewModel", "No hay usuario autenticado")
+                }
+            } catch (e: Exception) {
+                Log.e("PairingViewModel", "Excepción al cargar usuario: ${e.message}", e)
             }
         }
     }
