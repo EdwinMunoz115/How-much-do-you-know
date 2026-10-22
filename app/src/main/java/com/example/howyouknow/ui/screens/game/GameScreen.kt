@@ -49,12 +49,13 @@ import com.example.howyouknow.ui.viewmodel.GameViewModel
 fun GameScreen(
     viewModel: GameViewModel,
     onGameComplete: (String) -> Unit,
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    startPractice: Boolean = false
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
-    LaunchedEffect(Unit) {
-        viewModel.startGame()
+    LaunchedEffect(startPractice) {
+        if (startPractice) viewModel.startQuestionsGame(practice = true) else viewModel.startGame()
     }
 
     LaunchedEffect(uiState.gameCompleted) {

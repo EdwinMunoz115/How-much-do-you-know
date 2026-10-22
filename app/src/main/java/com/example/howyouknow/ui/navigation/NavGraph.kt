@@ -32,6 +32,7 @@ sealed class Screen(val route: String) {
     object Profile : Screen("profile")
     object Pairing : Screen("pairing")
     object CreateQuestion : Screen("create_question")
+    object Practice : Screen("practice")
     object Game : Screen("game")
     object Results : Screen("results/{sessionId}") {
         fun createRoute(sessionId: String) = "results/$sessionId"
@@ -67,7 +68,8 @@ fun NavGraph(
                 },
                 onNavigateToRegister = {
                     navController.navigate(Screen.Register.route)
-                }
+                },
+                onPlayPractice = { navController.navigate(Screen.Practice.route) }
             )
         }
 
@@ -101,7 +103,7 @@ fun NavGraph(
                     navController.navigate(Screen.Profile.route)
                 },
                 onNavigateToGame = {
-                    navController.navigate(Screen.Game.route)
+                    navController.navigate(if (hasPartner) Screen.Game.route else Screen.Practice.route)
                 },
                 onNavigateToPairing = {
                     navController.navigate(Screen.Pairing.route)
@@ -150,6 +152,19 @@ fun NavGraph(
             )
         }
 
+        composable(Screen.Practice.route) {
+            GameScreen(
+                viewModel = gameViewModel,
+                startPractice = true,
+                onGameComplete = { sessionId ->
+                    navController.navigate(Screen.Results.createRoute(sessionId)) {
+                        popUpTo(Screen.Practice.route) { inclusive = true }
+                    }
+                },
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
         composable(Screen.Game.route) {
             GameScreen(
                 viewModel = gameViewModel,
@@ -172,7 +187,7 @@ fun NavGraph(
             ResultsScreen(
                 sessionId = sessionId,
                 onNavigateBack = {
-                    navController.navigate(Screen.Home.route) {
+                    navController.navigate(if (authViewModel.getCurrentUserId() == null) Screen.Login.route else Screen.Home.route) {
                         popUpTo(0) { inclusive = true }
                     }
                 }

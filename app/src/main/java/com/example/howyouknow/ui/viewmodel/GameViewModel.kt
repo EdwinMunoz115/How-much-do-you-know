@@ -59,7 +59,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             )
 
             val currentUser = authRepository.getCurrentUser()
-            val userId = currentUser?.userId
+            val userId = currentUser?.userId ?: if (practice) "practice-guest" else null
             if (userId == null) {
                 _uiState.value = _uiState.value.copy(isLoading = false, errorMessage = "Inicia sesion para jugar.")
                 return@launch
