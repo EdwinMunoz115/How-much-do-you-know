@@ -8,10 +8,12 @@ import com.example.howyouknow.data.local.entity.AnsweredQuestionEntity
 import com.example.howyouknow.data.model.Answer
 import com.example.howyouknow.data.model.GameSession
 import com.example.howyouknow.data.model.Question
+import com.example.howyouknow.data.model.QuestionType
 import com.example.howyouknow.data.repository.LocalAuthRepository
 import com.example.howyouknow.data.repository.LocalGameRepository
 import com.example.howyouknow.data.repository.LocalQuestionRepository
 import com.example.howyouknow.data.repository.LocalUserRepository
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,17 +22,18 @@ import kotlinx.coroutines.launch
 
 data class GameUiState(
     val isLoading: Boolean = false,
-    val gameMenuVisible: Boolean = true, // Frame inicial con botones
+    val gameMenuVisible: Boolean = true,
     val session: GameSession? = null,
     val currentQuestion: Question? = null,
     val questions: List<Question> = emptyList(),
     val selectedAnswer: Any? = null,
-    val timeRemaining: Int = 60, // Timer de 60 segundos
-    val questionStartTime: Long = 0, // Tiempo de inicio de la pregunta actual
-    val answerTimes: Map<String, Long> = emptyMap(), // Tiempo por pregunta
-    val questionsAnswered: List<String> = emptyList(), // IDs de preguntas ya respondidas
+    val timeRemaining: Int = 60,
+    val questionStartTime: Long = 0,
+    val answerTimes: Map<String, Long> = emptyMap(),
+    val questionsAnswered: List<String> = emptyList(),
     val errorMessage: String? = null,
-    val gameCompleted: Boolean = false
+    val gameCompleted: Boolean = false,
+    val isPractice: Boolean = false
 )
 
 class GameViewModel(application: Application) : AndroidViewModel(application) {
@@ -43,46 +46,53 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private val _uiState = MutableStateFlow(GameUiState())
     val uiState: StateFlow<GameUiState> = _uiState.asStateFlow()
 
-    // Función para iniciar el juego desde el menú
-    fun startQuestionsGame() {
+    private var timerJob: Job? = null
+
+    fun startQuestionsGame(practice: Boolean = false) {
+        if (_uiState.value.isLoading) return
+        timerJob?.cancel()
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(
+            _uiState.value = GameUiState(
                 isLoading = true,
                 gameMenuVisible = false,
-                errorMessage = null
+                isPractice = practice
             )
 
             val currentUser = authRepository.getCurrentUser()
-            val userId = currentUser?.userId ?: return@launch
+            val userId = currentUser?.userId
+            if (userId == null) {
+                _uiState.value = _uiState.value.copy(isLoading = false, errorMessage = "Inicia sesion para jugar.")
+                return@launch
+            }
             val userResult = userRepository.getUser(userId)
             val user = userResult.getOrNull()
-            val partnerId = user?.partnerId
+            val partnerId = if (practice) "practice" else user?.partnerId
 
             if (partnerId == null) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    errorMessage = "No tienes pareja conectada"
+                    errorMessage = "Necesitas conectar a otro jugador para entrar al duelo."
                 )
                 return@launch
             }
 
-            // Obtener preguntas creadas por la pareja
-            val questionsResult = questionRepository.getQuestionsForPartner(userId)
+            val questionsResult = if (practice) {
+                runCatching { loadPracticeQuestions() }
+            } else {
+                questionRepository.getQuestionsForPartner(userId)
+            }
             val allQuestions = questionsResult.getOrNull() ?: emptyList()
 
             if (allQuestions.isEmpty()) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    errorMessage = "No hay preguntas disponibles. Tu pareja debe crear preguntas primero."
+                    errorMessage = "Aun no hay retos disponibles. Primero crea uno o espera a que el otro jugador te envie uno."
                 )
                 return@launch
             }
 
-            // Obtener preguntas ya respondidas
             val answeredQuestionIds = answeredQuestionDao.getAnsweredQuestionIds(userId).toSet()
-            
-            // Filtrar preguntas no respondidas y tomar 5 aleatorias
-            val unansweredQuestions = allQuestions.filter { it.questionId !in answeredQuestionIds }
+            val unansweredQuestions = if (practice) allQuestions else allQuestions.filter { it.questionId !in answeredQuestionIds }
             val selectedQuestions = if (unansweredQuestions.size >= 5) {
                 unansweredQuestions.shuffled().take(5)
             } else {
@@ -92,12 +102,11 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             if (selectedQuestions.isEmpty()) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    errorMessage = "Ya has respondido todas las preguntas disponibles."
+                    errorMessage = "Ya jugaste todos los retos visuales disponibles."
                 )
                 return@launch
             }
 
-            // Crear sesión de juego
             val questionIds = selectedQuestions.map { it.questionId }
             val sessionResult = gameRepository.createGameSession(userId, partnerId, questionIds)
             val sessionId = sessionResult.getOrNull()
@@ -105,52 +114,84 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             if (sessionId == null) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
-                    errorMessage = "Error al crear sesión de juego"
+                    errorMessage = "No se pudo crear la sesion de juego"
                 )
                 return@launch
             }
 
-            val sessionResult2 = gameRepository.getGameSession(sessionId)
-            val session = sessionResult2.getOrNull()
+            val session = gameRepository.getGameSession(sessionId).getOrNull()
+            val firstQuestion = selectedQuestions.firstOrNull()
 
             _uiState.value = _uiState.value.copy(
                 isLoading = false,
                 session = session,
                 questions = selectedQuestions,
-                currentQuestion = selectedQuestions.firstOrNull(),
+                currentQuestion = firstQuestion,
+                selectedAnswer = defaultAnswerForQuestion(firstQuestion),
                 questionStartTime = System.currentTimeMillis(),
                 timeRemaining = 60
             )
 
-            // Iniciar timer
             startTimer()
         }
     }
 
-    // Función original mantenida para compatibilidad
-    fun startGame() {
-        // Por defecto mostrar el menú
-        _uiState.value = _uiState.value.copy(gameMenuVisible = true)
+    private suspend fun loadPracticeQuestions(): List<Question> {
+        val recipient = "practice-examples-v1"
+        val existing = questionRepository.getQuestionsForPartner(recipient).getOrThrow()
+        if (existing.size == 3) return existing
+        val colors = listOf("Rojo", "Amarillo", "Verde")
+        val examples = listOf(
+            Question(
+                questionText = "Ordena los colores del semaforo de arriba hacia abajo",
+                questionType = QuestionType.RANKING,
+                options = colors,
+                correctAnswer = colors,
+                mediaItems = listOf("practice_red", "practice_yellow", "practice_green").map {
+                    com.example.howyouknow.data.model.MediaItem(
+                        uri = "android.resource://${getApplication<Application>().packageName}/drawable/$it"
+                    )
+                }
+            ),
+            Question(
+                questionText = "Cuanto es 2 + 2?",
+                questionType = QuestionType.MULTIPLE_CHOICE,
+                options = listOf("3", "4", "5"),
+                correctAnswer = "4"
+            ),
+            Question(
+                questionText = "El Sol es una estrella?",
+                questionType = QuestionType.YES_NO,
+                options = listOf("Si", "No"),
+                correctAnswer = "Si"
+            )
+        )
+        return examples.map { question ->
+            existing.firstOrNull { it.questionText == question.questionText } ?: run {
+                val sample = question.copy(creatorId = "practice", partnerId = recipient)
+                val id = questionRepository.createQuestion(sample).getOrThrow()
+                sample.copy(questionId = id)
+            }
+        }
     }
 
-    // Timer de 60 segundos
-    private var timerJob: kotlinx.coroutines.Job? = null
-    
+    fun startGame() {
+        timerJob?.cancel()
+        _uiState.value = GameUiState()
+    }
+
     private fun startTimer() {
         timerJob?.cancel()
         timerJob = viewModelScope.launch {
             while (_uiState.value.timeRemaining > 0 && !_uiState.value.gameCompleted) {
                 delay(1000)
-                if (!_uiState.value.gameCompleted) {
-                    val newTime = _uiState.value.timeRemaining - 1
-                    _uiState.value = _uiState.value.copy(timeRemaining = newTime)
-                    
-                    if (newTime <= 0) {
-                        // Tiempo agotado, finalizar juego
-                        finishGame()
-                        break
-                    }
-                } else {
+                if (_uiState.value.gameCompleted) break
+
+                val newTime = _uiState.value.timeRemaining - 1
+                _uiState.value = _uiState.value.copy(timeRemaining = newTime)
+
+                if (newTime <= 0) {
+                    finishGame()
                     break
                 }
             }
@@ -170,18 +211,27 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.value = _uiState.value.copy(selectedAnswer = answer)
     }
 
+    fun moveRankingAnswer(fromIndex: Int, toIndex: Int) {
+        val currentAnswer = (_uiState.value.selectedAnswer as? List<*>)?.mapNotNull { it?.toString() }?.toMutableList()
+            ?: return
+        if (fromIndex !in currentAnswer.indices || toIndex !in currentAnswer.indices) {
+            return
+        }
+
+        val moved = currentAnswer.removeAt(fromIndex)
+        currentAnswer.add(toIndex, moved)
+        _uiState.value = _uiState.value.copy(selectedAnswer = currentAnswer)
+    }
+
     fun submitAnswer() {
         viewModelScope.launch {
             val session = _uiState.value.session ?: return@launch
             val currentQuestion = _uiState.value.currentQuestion ?: return@launch
             val selectedAnswer = _uiState.value.selectedAnswer ?: return@launch
-            
-            // Calcular tiempo de respuesta
-            val timeSpent = System.currentTimeMillis() - _uiState.value.questionStartTime
 
+            val timeSpent = System.currentTimeMillis() - _uiState.value.questionStartTime
             val isCorrect = checkAnswer(currentQuestion, selectedAnswer)
-            // +100 puntos por respuesta correcta a la primera
-            val points = if (isCorrect) 100 else 0
+            val points = calculatePoints(currentQuestion, selectedAnswer)
 
             val answer = Answer(
                 questionId = currentQuestion.questionId,
@@ -193,12 +243,10 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 timeSpent = timeSpent
             )
 
-            // Guardar respuesta
             gameRepository.addAnswer(session.sessionId, answer)
 
-            // Marcar pregunta como respondida
             val currentUserId = authRepository.getCurrentUser()?.userId
-            if (currentUserId != null) {
+            if (currentUserId != null && !_uiState.value.isPractice) {
                 answeredQuestionDao.insertAnsweredQuestion(
                     AnsweredQuestionEntity(
                         userId = currentUserId,
@@ -207,78 +255,89 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 )
             }
 
-            // Actualizar puntos del usuario si es correcta
-            if (points > 0) {
+            if (points > 0 && !_uiState.value.isPractice) {
                 userRepository.addPoints(session.userId, points)
             }
 
-            // Guardar tiempo de respuesta
             val updatedAnswerTimes = _uiState.value.answerTimes + (currentQuestion.questionId to timeSpent)
             val updatedAnswered = _uiState.value.questionsAnswered + currentQuestion.questionId
+            val updatedSession = gameRepository.getGameSession(session.sessionId).getOrNull() ?: session
 
-            // Recargar sesión actualizada
-            val updatedSessionResult = gameRepository.getGameSession(session.sessionId)
-            val updatedSession = updatedSessionResult.getOrNull() ?: session
-
-            // Actualizar estado local
             _uiState.value = _uiState.value.copy(
                 session = updatedSession,
                 answerTimes = updatedAnswerTimes,
                 questionsAnswered = updatedAnswered
             )
 
-            // Pasar a la siguiente pregunta
             moveToNextQuestion()
         }
     }
 
-    // Funciones de comodines y segunda oportunidad removidas según nuevos requerimientos
-
     private fun moveToNextQuestion() {
         val session = _uiState.value.session ?: return
         val questions = _uiState.value.questions
-        val nextIndex = session.currentQuestionIndex + 1
+        val nextIndex = session.currentQuestionIndex
 
         if (nextIndex >= questions.size || _uiState.value.timeRemaining <= 0) {
-            // Juego completado
             viewModelScope.launch {
                 gameRepository.completeGameSession(session.sessionId)
                 _uiState.value = _uiState.value.copy(gameCompleted = true)
             }
         } else {
-            // Pasar a la siguiente pregunta
+            val nextQuestion = questions[nextIndex]
             _uiState.value = _uiState.value.copy(
-                currentQuestion = questions[nextIndex],
-                selectedAnswer = null,
+                currentQuestion = nextQuestion,
+                selectedAnswer = defaultAnswerForQuestion(nextQuestion),
                 questionStartTime = System.currentTimeMillis()
             )
         }
     }
 
+    private fun defaultAnswerForQuestion(question: Question?): Any? {
+        return when (question?.questionType) {
+            QuestionType.RANKING -> question.options.shuffled()
+            else -> null
+        }
+    }
+
+    private fun calculatePoints(question: Question, userAnswer: Any?): Int {
+        return when (question.questionType) {
+            QuestionType.RANKING -> {
+                val expected = (question.correctAnswer as? List<*>)?.mapNotNull { it?.toString() } ?: emptyList()
+                val actual = (userAnswer as? List<*>)?.mapNotNull { it?.toString() } ?: emptyList()
+                val exactMatches = expected.indices.count { index ->
+                    index < actual.size && expected[index] == actual[index]
+                }
+                val bonus = if (expected == actual && expected.isNotEmpty()) 120 else 0
+                exactMatches * 40 + bonus
+            }
+
+            QuestionType.MULTIPLE_CHOICE, QuestionType.YES_NO, QuestionType.OPEN -> {
+                if (checkAnswer(question, userAnswer)) 100 else 0
+            }
+
+            QuestionType.SURVEY -> 40
+        }
+    }
+
     private fun checkAnswer(question: Question, userAnswer: Any?): Boolean {
         return when (question.questionType) {
-            com.example.howyouknow.data.model.QuestionType.MULTIPLE_CHOICE,
-            com.example.howyouknow.data.model.QuestionType.YES_NO -> {
-                userAnswer == question.correctAnswer
+            QuestionType.MULTIPLE_CHOICE,
+            QuestionType.YES_NO -> userAnswer == question.correctAnswer
+
+            QuestionType.RANKING -> {
+                val expected = (question.correctAnswer as? List<*>)?.mapNotNull { it?.toString() } ?: emptyList()
+                val actual = (userAnswer as? List<*>)?.mapNotNull { it?.toString() } ?: emptyList()
+                expected == actual
             }
-            com.example.howyouknow.data.model.QuestionType.RANKING,
-            com.example.howyouknow.data.model.QuestionType.SURVEY -> {
-                // Para ranking, comparar listas
-                if (userAnswer is List<*> && question.correctAnswer is List<*>) {
-                    userAnswer == question.correctAnswer
-                } else {
-                    false
-                }
-            }
-            com.example.howyouknow.data.model.QuestionType.OPEN -> {
-                // Para preguntas abiertas, comparación de texto (case-insensitive)
+
+            QuestionType.SURVEY -> true
+
+            QuestionType.OPEN -> {
                 val userText = userAnswer.toString().trim().lowercase()
                 val correctText = question.correctAnswer.toString().trim().lowercase()
                 userText == correctText
             }
         }
     }
-
-    // Función removida - ahora siempre +100 por respuesta correcta
 }
-

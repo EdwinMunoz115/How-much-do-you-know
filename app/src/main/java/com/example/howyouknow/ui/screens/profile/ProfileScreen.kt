@@ -1,15 +1,39 @@
 package com.example.howyouknow.ui.screens.profile
 
-import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import android.content.Context
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.ui.platform.LocalContext
 import com.example.howyouknow.data.repository.LocalUserRepository
 import com.example.howyouknow.ui.viewmodel.AuthViewModel
@@ -40,7 +64,6 @@ fun ProfileScreen(
                         isLoading = false
                     },
                     onFailure = {
-                        // Si falla, usar datos del authViewModel
                         user = com.example.howyouknow.data.model.User(
                             userId = authUser.userId,
                             name = authUser.name,
@@ -63,7 +86,7 @@ fun ProfileScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Mi Perfil") }
+                title = { Text("Mi perfil") }
             )
         }
     ) { paddingValues ->
@@ -84,7 +107,6 @@ fun ProfileScreen(
                     .padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Avatar/Icon
                 Icon(
                     imageVector = Icons.Default.Person,
                     contentDescription = "Usuario",
@@ -94,7 +116,6 @@ fun ProfileScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Información del usuario
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
@@ -103,18 +124,19 @@ fun ProfileScreen(
                         modifier = Modifier.padding(16.dp)
                     ) {
                         InfoRow("Nombre", user?.name ?: "")
-                        Divider(modifier = Modifier.padding(vertical = 8.dp))
+                        DividerSpace()
                         InfoRow("Correo", user?.email ?: "")
-                        Divider(modifier = Modifier.padding(vertical = 8.dp))
-                        InfoRow("Edad", "${user?.age ?: 0} años")
-                        Divider(modifier = Modifier.padding(vertical = 8.dp))
+                        DividerSpace()
+                        InfoRow("Edad", "${user?.age ?: 0} anos")
+                        DividerSpace()
                         InfoRow("Puntos totales", "${user?.totalPoints ?: 0}")
+                        DividerSpace()
+                        InfoRow("Codigo de juego", user?.invitationCode ?: "")
                     }
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Estado de pareja
                 if (user?.partnerId == null) {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -127,12 +149,12 @@ fun ProfileScreen(
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
-                                text = "No tienes pareja conectada",
+                                text = "Aun no tienes rival conectado",
                                 style = MaterialTheme.typography.titleMedium,
                                 modifier = Modifier.padding(bottom = 8.dp)
                             )
                             Button(onClick = onNavigateToPairing) {
-                                Text("Conectar con pareja")
+                                Text("Conectar jugador")
                             }
                         }
                     }
@@ -144,7 +166,7 @@ fun ProfileScreen(
                         )
                     ) {
                         Text(
-                            text = "✓ Pareja conectada",
+                            text = "Jugador conectado y listo para competir",
                             style = MaterialTheme.typography.titleMedium,
                             modifier = Modifier.padding(16.dp),
                             color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -155,14 +177,12 @@ fun ProfileScreen(
                 Spacer(modifier = Modifier.height(24.dp))
 
                 OutlinedButton(
-                    onClick = {
-                        onLogout()
-                    },
+                    onClick = onLogout,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp)
                 ) {
-                    Text("Cerrar sesión")
+                    Text("Cerrar sesion")
                 }
             }
         }
@@ -187,3 +207,7 @@ private fun InfoRow(label: String, value: String) {
     }
 }
 
+@Composable
+private fun DividerSpace() {
+    Spacer(modifier = Modifier.height(12.dp))
+}

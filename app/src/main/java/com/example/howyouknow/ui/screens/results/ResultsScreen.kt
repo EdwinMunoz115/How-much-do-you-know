@@ -1,16 +1,39 @@
 package com.example.howyouknow.ui.screens.results
 
-import android.content.Context
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Divider
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.howyouknow.data.model.Answer
+import com.example.howyouknow.data.model.Question
 import com.example.howyouknow.data.repository.LocalGameRepository
 import com.example.howyouknow.data.repository.LocalQuestionRepository
 import kotlinx.coroutines.launch
@@ -21,11 +44,11 @@ fun ResultsScreen(
     sessionId: String,
     onNavigateBack: () -> Unit
 ) {
-    val context = LocalContext.current
+    val context = androidx.compose.ui.platform.LocalContext.current
     val gameRepository = remember { LocalGameRepository(context) }
     val questionRepository = remember { LocalQuestionRepository(context) }
     var session by remember { mutableStateOf<com.example.howyouknow.data.model.GameSession?>(null) }
-    var questions by remember { mutableStateOf<List<com.example.howyouknow.data.model.Question>>(emptyList()) }
+    var questions by remember { mutableStateOf<List<Question>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     val scope = rememberCoroutineScope()
 
@@ -47,12 +70,7 @@ fun ResultsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Resultados") },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Text("←")
-                    }
-                }
+                title = { Text("Resultados") }
             )
         }
     ) { paddingValues ->
@@ -73,7 +91,6 @@ fun ResultsScreen(
                     .padding(16.dp)
                     .verticalScroll(rememberScrollState())
             ) {
-                // Resumen de puntaje
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -88,7 +105,7 @@ fun ResultsScreen(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            text = "Puntaje Final",
+                            text = "Puntaje final",
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onPrimaryContainer
                         )
@@ -100,7 +117,7 @@ fun ResultsScreen(
                             modifier = Modifier.padding(top = 8.dp)
                         )
                         Text(
-                            text = "Preguntas respondidas: ${session!!.answers.size}/${session!!.questionIds.size}",
+                            text = "Retos respondidos: ${session!!.answers.size}/${session!!.questionIds.size}",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onPrimaryContainer,
                             modifier = Modifier.padding(top = 8.dp)
@@ -108,9 +125,8 @@ fun ResultsScreen(
                     }
                 }
 
-                // Detalle de respuestas
                 Text(
-                    text = "Detalle de Respuestas",
+                    text = "Detalle de resultados",
                     style = MaterialTheme.typography.titleLarge,
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
@@ -143,8 +159,8 @@ fun ResultsScreen(
 @Composable
 private fun AnswerComparison(
     questionNumber: Int,
-    question: com.example.howyouknow.data.model.Question,
-    answer: com.example.howyouknow.data.model.Answer?
+    question: Question,
+    answer: Answer?
 ) {
     val isCorrect = answer?.isCorrect ?: false
 
@@ -152,9 +168,9 @@ private fun AnswerComparison(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = if (isCorrect) {
-                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.32f)
             } else {
-                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+                MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.32f)
             }
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
@@ -168,18 +184,14 @@ private fun AnswerComparison(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Pregunta $questionNumber",
+                    text = "Reto $questionNumber",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = if (isCorrect) "✓ Correcta" else "✗ Incorrecta",
+                    text = if (isCorrect) "Acierto" else "Casi",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = if (isCorrect) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.error
-                    },
+                    color = if (isCorrect) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
                     fontWeight = FontWeight.Bold
                 )
             }
@@ -198,46 +210,44 @@ private fun AnswerComparison(
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = answer?.userAnswer?.toString() ?: "Sin respuesta",
+                text = formatAnswer(answer?.userAnswer),
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
 
             Text(
-                text = "Respuesta correcta:",
+                text = "Respuesta esperada:",
                 style = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = question.correctAnswer?.toString() ?: "N/A",
+                text = formatAnswer(question.correctAnswer),
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
 
             if (answer != null) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column {
-                        Text(
-                            text = "Puntos: ${answer.pointsEarned}",
-                            style = MaterialTheme.typography.bodySmall,
-                            fontWeight = FontWeight.Bold
-                        )
-                        // Mostrar tiempo de respuesta
-                        val timeSeconds = (answer.timeSpent / 1000).toInt()
-                        Text(
-                            text = "Tiempo: ${timeSeconds}s",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                        )
-                    }
-                }
+                Text(
+                    text = "Puntos: ${answer.pointsEarned}",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "Tiempo: ${(answer.timeSpent / 1000).toInt()}s",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                )
             }
         }
     }
 }
 
+private fun formatAnswer(value: Any?): String {
+    return when (value) {
+        is List<*> -> value.mapIndexedNotNull { index, item ->
+            item?.toString()?.takeIf { it.isNotBlank() }?.let { "${index + 1}. $it" }
+        }.joinToString("\n").ifBlank { "Sin respuesta" }
+        null -> "Sin respuesta"
+        else -> value.toString()
+    }
+}

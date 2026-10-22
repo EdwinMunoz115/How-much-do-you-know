@@ -3,15 +3,40 @@ package com.example.howyouknow.ui.screens.pairing
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
-import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.Share
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -33,246 +58,138 @@ fun PairingScreen(
         }
     }
 
-    // Función para copiar código al portapapeles
     fun copyToClipboard(text: String) {
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        val clip = ClipData.newPlainText("Código de invitación", text)
+        val clip = ClipData.newPlainText("Codigo de juego", text)
         clipboard.setPrimaryClip(clip)
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+    Scaffold(
+        topBar = {
+            TopAppBar(title = { Text("Conectar jugador") })
+        }
+    ) { paddingValues ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .padding(20.dp),
+            contentAlignment = Alignment.Center
         ) {
-            if (uiState.isPaired) {
-                // Ya está conectado
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = Color(0xFFFFE5E5) // Rosa claro
-                    ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(32.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(18.dp)
+            ) {
+                HeroConnectCard()
+
+                if (uiState.isPaired) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer
+                        )
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Favorite,
-                            contentDescription = null,
-                            modifier = Modifier.size(64.dp),
-                            tint = Color(0xFFFF6B9D)
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            text = "Ya estás conectado con tu pareja",
-                            style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFFD32F2F)
-                        )
-                        Spacer(modifier = Modifier.height(24.dp))
-                        Button(
-                            onClick = onPairingSuccess,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFFFF6B9D)
-                            ),
-                            modifier = Modifier.fillMaxWidth()
+                        Column(
+                            modifier = Modifier.padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Text("Continuar")
+                            Text(
+                                text = "Ya tienes una conexion activa",
+                                style = MaterialTheme.typography.titleLarge,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = "Ahora puedes crear retos y competir en la arena.",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                            Spacer(modifier = Modifier.height(18.dp))
+                            Button(onClick = onPairingSuccess) {
+                                Text("Continuar")
+                            }
                         }
                     }
-                }
-            } else {
-                // Mostrar código propio con temática de amor
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 32.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = Color(0xFFFFE5E5) // Rosa claro
-                    ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(32.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                } else {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 5.dp)
                     ) {
-                        // Iconos de corazón
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.padding(bottom = 16.dp)
+                        Column(
+                            modifier = Modifier.padding(20.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Favorite,
-                                contentDescription = null,
-                                tint = Color(0xFFFF6B9D),
-                                modifier = Modifier.size(32.dp)
+                            Text(
+                                text = "Tu codigo",
+                                style = MaterialTheme.typography.titleLarge
                             )
-                            Icon(
-                                imageVector = Icons.Default.Favorite,
-                                contentDescription = null,
-                                tint = Color(0xFFFF6B9D),
-                                modifier = Modifier.size(32.dp)
-                            )
-                        }
-                        
-                        Text(
-                            text = "Tu código de invitación",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFFD32F2F),
-                            modifier = Modifier.padding(bottom = 16.dp)
-                        )
-                        
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(
-                                containerColor = Color.White
-                            ),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                        ) {
                             Text(
                                 text = uiState.currentUser?.invitationCode ?: "Cargando...",
-                                style = MaterialTheme.typography.displaySmall,
-                                fontWeight = FontWeight.Bold,
-                                color = Color(0xFFFF6B9D),
-                                modifier = Modifier.padding(24.dp)
+                                style = MaterialTheme.typography.headlineMedium,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = MaterialTheme.colorScheme.primary
                             )
-                        }
-                        
-                        Spacer(modifier = Modifier.height(16.dp))
-                        
-                        Text(
-                            text = "Comparte este código con tu pareja",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Color(0xFFD32F2F),
-                            modifier = Modifier.padding(bottom = 16.dp)
-                        )
-                        
-                        // Botón para compartir/copiar
-                        OutlinedButton(
-                            onClick = {
-                                uiState.currentUser?.invitationCode?.let { copyToClipboard(it) }
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.outlinedButtonColors(
-                                contentColor = Color(0xFFFF6B9D)
+                            Text(
+                                text = "Compartelo con un amigo o rival para que pueda entrar a tus retos.",
+                                style = MaterialTheme.typography.bodyMedium
                             )
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Share,
-                                contentDescription = "Compartir",
-                                modifier = Modifier.padding(end = 8.dp)
-                            )
-                            Text("Copiar código")
+                            OutlinedButton(
+                                onClick = {
+                                    uiState.currentUser?.invitationCode?.let { copyToClipboard(it) }
+                                }
+                            ) {
+                                Text("Copiar codigo")
+                            }
                         }
                     }
-                }
 
-                // Divider decorativo
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 24.dp),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Favorite,
-                        contentDescription = null,
-                        tint = Color(0xFFFF6B9D),
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "O",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = Color(0xFFD32F2F),
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Icon(
-                        imageVector = Icons.Default.Favorite,
-                        contentDescription = null,
-                        tint = Color(0xFFFF6B9D),
-                        modifier = Modifier.size(16.dp)
-                    )
-                }
-
-                // Ingresar código de pareja
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = Color(0xFFFFE5E5)
-                    ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(24.dp)
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 5.dp)
                     ) {
-                        Text(
-                            text = "Ingresa el código de tu pareja",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFFD32F2F),
-                            modifier = Modifier.padding(bottom = 16.dp)
-                        )
-
-                        OutlinedTextField(
-                            value = codeInput,
-                            onValueChange = { codeInput = it.uppercase() },
-                            label = { Text("Código de invitación") },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 16.dp),
-                            singleLine = true,
-                            placeholder = { Text("Ej: ABC123") },
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = Color(0xFFFF6B9D),
-                                unfocusedBorderColor = Color(0xFFFF6B9D).copy(alpha = 0.5f)
-                            )
-                        )
-
-                        if (uiState.errorMessage != null) {
-                            Text(
-                                text = uiState.errorMessage!!,
-                                color = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.padding(bottom = 16.dp)
-                            )
-                        }
-
-                        Button(
-                            onClick = { viewModel.connectWithCode(codeInput) },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(56.dp),
-                            enabled = !uiState.isLoading && codeInput.isNotBlank() && codeInput.length == 6,
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = Color(0xFFFF6B9D)
-                            )
+                        Column(
+                            modifier = Modifier.padding(20.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            if (uiState.isLoading) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(24.dp),
-                                    color = Color.White
+                            Text(
+                                text = "Ingresar codigo",
+                                style = MaterialTheme.typography.titleLarge
+                            )
+                            OutlinedTextField(
+                                value = codeInput,
+                                onValueChange = { codeInput = it.uppercase() },
+                                label = { Text("Codigo de invitacion") },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                placeholder = { Text("Ej. ABC123") }
+                            )
+
+                            if (uiState.errorMessage != null) {
+                                Text(
+                                    text = uiState.errorMessage ?: "",
+                                    color = MaterialTheme.colorScheme.error
                                 )
-                            } else {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Favorite,
-                                        contentDescription = null,
-                                        modifier = Modifier.padding(end = 8.dp)
+                            }
+
+                            Button(
+                                onClick = { viewModel.connectWithCode(codeInput) },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(56.dp),
+                                enabled = !uiState.isLoading && codeInput.length == 6,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary
+                                )
+                            ) {
+                                if (uiState.isLoading) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(24.dp),
+                                        color = MaterialTheme.colorScheme.onPrimary
                                     )
-                                    Text("Conectar con pareja")
+                                } else {
+                                    Text("Conectar jugador")
                                 }
                             }
                         }
@@ -283,3 +200,43 @@ fun PairingScreen(
     }
 }
 
+@Composable
+private fun HeroConnectCard() {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(1.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        Brush.linearGradient(
+                            listOf(
+                                MaterialTheme.colorScheme.primary,
+                                MaterialTheme.colorScheme.secondary
+                            )
+                        ),
+                        RoundedCornerShape(24.dp)
+                    )
+                    .padding(22.dp)
+            ) {
+                Text(
+                    text = "Una conexion, muchos duelos",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onPrimary
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Usa un codigo para compartir retos visuales y minijuegos competitivos.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.88f)
+                )
+            }
+        }
+    }
+}

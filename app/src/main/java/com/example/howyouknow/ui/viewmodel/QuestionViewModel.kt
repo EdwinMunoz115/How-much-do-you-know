@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.howyouknow.data.model.MediaItem
+import com.example.howyouknow.data.model.MediaType
 import com.example.howyouknow.data.model.Question
 import com.example.howyouknow.data.model.QuestionType
 import com.example.howyouknow.data.repository.LocalAuthRepository
@@ -17,14 +18,16 @@ import kotlinx.coroutines.launch
 data class QuestionUiState(
     val isLoading: Boolean = false,
     val questionText: String = "",
-    val questionType: QuestionType = QuestionType.MULTIPLE_CHOICE,
-    val options: List<String> = listOf("", ""),
-    val mediaItems: List<MediaItem> = emptyList(),
+    val questionType: QuestionType = QuestionType.RANKING,
+    val options: List<String> = listOf("", "", ""),
+    val mediaItems: List<MediaItem> = List(3) { emptyMediaItem() },
     val correctAnswer: Any? = null,
     val errorMessage: String? = null,
     val successMessage: String? = null,
     val partnerId: String? = null
 )
+
+private fun emptyMediaItem(): MediaItem = MediaItem(type = MediaType.IMAGE, uri = "")
 
 class QuestionViewModel(application: Application) : AndroidViewModel(application) {
     private val authRepository = LocalAuthRepository(application)
@@ -36,6 +39,7 @@ class QuestionViewModel(application: Application) : AndroidViewModel(application
 
     init {
         loadPartnerId()
+        syncCorrectAnswerWithOptions()
     }
 
     private fun loadPartnerId() {
@@ -57,37 +61,67 @@ class QuestionViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun updateQuestionType(type: QuestionType) {
+        val current = _uiState.value
         val newOptions = when (type) {
-            QuestionType.YES_NO -> listOf("Sí", "No")
+            QuestionType.YES_NO -> listOf("Si", "No")
             QuestionType.OPEN -> emptyList()
-            else -> if (_uiState.value.options.isEmpty()) listOf("", "") else _uiState.value.options
+            QuestionType.RANKING -> ensureMinimumItems(current.options, 3)
+            else -> ensureMinimumItems(current.options, 2)
         }
-        _uiState.value = _uiState.value.copy(
+        val newMedia = when (type) {
+            QuestionType.RANKING -> syncMediaWithOptions(current.mediaItems, newOptions.size)
+            else -> current.mediaItems
+        }
+
+        _uiState.value = current.copy(
             questionType = type,
             options = newOptions,
+            mediaItems = newMedia,
             correctAnswer = null
         )
+        syncCorrectAnswerWithOptions()
     }
 
     fun addOption() {
         val currentOptions = _uiState.value.options.toMutableList()
         currentOptions.add("")
-        _uiState.value = _uiState.value.copy(options = currentOptions)
+        _uiState.value = _uiState.value.copy(
+            options = currentOptions,
+            mediaItems = syncMediaWithOptions(_uiState.value.mediaItems, currentOptions.size)
+        )
+        syncCorrectAnswerWithOptions()
     }
 
     fun removeOption(index: Int) {
         val currentOptions = _uiState.value.options.toMutableList()
-        if (currentOptions.size > 2) {
+        if (currentOptions.size > 2 && index in currentOptions.indices) {
             currentOptions.removeAt(index)
-            _uiState.value = _uiState.value.copy(options = currentOptions)
+            val currentMedia = _uiState.value.mediaItems.toMutableList()
+            if (index in currentMedia.indices) {
+                currentMedia.removeAt(index)
+            }
+            _uiState.value = _uiState.value.copy(
+                options = currentOptions,
+                mediaItems = syncMediaWithOptions(currentMedia, currentOptions.size)
+            )
+            syncCorrectAnswerWithOptions()
         }
     }
 
     fun updateOption(index: Int, value: String) {
         val currentOptions = _uiState.value.options.toMutableList()
-        if (index < currentOptions.size) {
+        if (index in currentOptions.indices) {
             currentOptions[index] = value
             _uiState.value = _uiState.value.copy(options = currentOptions)
+            syncCorrectAnswerWithOptions()
+        }
+    }
+
+    fun updateMediaUri(index: Int, uri: String) {
+        val currentMedia = syncMediaWithOptions(_uiState.value.mediaItems, _uiState.value.options.size).toMutableList()
+        if (index in currentMedia.indices) {
+            currentMedia[index] = currentMedia[index].copy(uri = uri.trim())
+            _uiState.value = _uiState.value.copy(mediaItems = currentMedia)
         }
     }
 
@@ -95,16 +129,15 @@ class QuestionViewModel(application: Application) : AndroidViewModel(application
         _uiState.value = _uiState.value.copy(correctAnswer = answer)
     }
 
-    fun addMediaItem(mediaItem: MediaItem) {
-        val currentMedia = _uiState.value.mediaItems.toMutableList()
-        currentMedia.add(mediaItem)
-        _uiState.value = _uiState.value.copy(mediaItems = currentMedia)
-    }
+    fun moveRankingItem(fromIndex: Int, toIndex: Int) {
+        val options = _uiState.value.options.toMutableList()
+        if (fromIndex !in options.indices || toIndex !in options.indices) {
+            return
+        }
 
-    fun removeMediaItem(index: Int) {
-        val currentMedia = _uiState.value.mediaItems.toMutableList()
-        currentMedia.removeAt(index)
-        _uiState.value = _uiState.value.copy(mediaItems = currentMedia)
+        val moved = options.removeAt(fromIndex)
+        options.add(toIndex, moved)
+        _uiState.value = _uiState.value.copy(correctAnswer = options.filter { it.isNotBlank() })
     }
 
     fun saveQuestion() {
@@ -115,16 +148,44 @@ class QuestionViewModel(application: Application) : AndroidViewModel(application
 
             if (userId == null || partnerId == null) {
                 _uiState.value = _uiState.value.copy(
-                    errorMessage = "No tienes pareja conectada"
+                    errorMessage = "Primero conecta a otro jugador para compartir retos."
                 )
                 return@launch
             }
 
             if (_uiState.value.questionText.isBlank()) {
                 _uiState.value = _uiState.value.copy(
-                    errorMessage = "La pregunta no puede estar vacía"
+                    errorMessage = "El titulo del reto no puede estar vacio"
                 )
                 return@launch
+            }
+
+            val optionMediaPairs = _uiState.value.options.mapIndexedNotNull { index, option ->
+                option.trim().takeIf { it.isNotBlank() }?.let { trimmed ->
+                    trimmed to _uiState.value.mediaItems.getOrElse(index) { emptyMediaItem() }
+                }
+            }
+            val cleanOptions = optionMediaPairs.map { it.first }
+            if (cleanOptions.size < 2) {
+                _uiState.value = _uiState.value.copy(
+                    errorMessage = "Agrega al menos dos opciones para el reto"
+                )
+                return@launch
+            }
+
+            val cleanMedia = optionMediaPairs.map { it.second }
+            if (_uiState.value.questionType == QuestionType.RANKING && cleanMedia.any { it.uri.isBlank() }) {
+                _uiState.value = _uiState.value.copy(
+                    errorMessage = "Cada opcion del top necesita una imagen"
+                )
+                return@launch
+            }
+
+            val correctAnswer = when (_uiState.value.questionType) {
+                QuestionType.RANKING -> {
+                    (_uiState.value.correctAnswer as? List<*>)?.mapNotNull { it?.toString() } ?: cleanOptions
+                }
+                else -> _uiState.value.correctAnswer
             }
 
             val question = Question(
@@ -132,29 +193,25 @@ class QuestionViewModel(application: Application) : AndroidViewModel(application
                 partnerId = partnerId,
                 questionText = _uiState.value.questionText,
                 questionType = _uiState.value.questionType,
-                options = _uiState.value.options.filter { it.isNotBlank() },
-                mediaItems = _uiState.value.mediaItems,
-                correctAnswer = _uiState.value.correctAnswer
+                options = cleanOptions,
+                mediaItems = cleanMedia,
+                correctAnswer = correctAnswer
             )
 
             _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
             val result = questionRepository.createQuestion(question)
-            
+
             result.fold(
                 onSuccess = {
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        successMessage = "Pregunta guardada exitosamente",
-                        questionText = "",
-                        options = listOf("", ""),
-                        mediaItems = emptyList(),
-                        correctAnswer = null
+                    _uiState.value = QuestionUiState(
+                        successMessage = "Reto guardado exitosamente",
+                        partnerId = _uiState.value.partnerId
                     )
                 },
                 onFailure = { exception ->
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        errorMessage = exception.message ?: "Error al guardar la pregunta"
+                        errorMessage = exception.message ?: "Error al guardar el reto"
                     )
                 }
             )
@@ -168,5 +225,28 @@ class QuestionViewModel(application: Application) : AndroidViewModel(application
     fun clearSuccess() {
         _uiState.value = _uiState.value.copy(successMessage = null)
     }
-}
 
+    private fun syncCorrectAnswerWithOptions() {
+        if (_uiState.value.questionType == QuestionType.RANKING) {
+            _uiState.value = _uiState.value.copy(
+                correctAnswer = _uiState.value.options.filter { it.isNotBlank() }
+            )
+        }
+    }
+
+    private fun ensureMinimumItems(options: List<String>, minItems: Int): List<String> {
+        val normalized = if (options.isEmpty()) mutableListOf<String>() else options.toMutableList()
+        while (normalized.size < minItems) {
+            normalized.add("")
+        }
+        return normalized
+    }
+
+    private fun syncMediaWithOptions(media: List<MediaItem>, optionCount: Int): List<MediaItem> {
+        val mutable = media.toMutableList()
+        while (mutable.size < optionCount) {
+            mutable.add(emptyMediaItem())
+        }
+        return mutable.take(optionCount)
+    }
+}

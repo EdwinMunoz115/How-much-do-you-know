@@ -119,7 +119,7 @@ class PairingViewModel(application: Application) : AndroidViewModel(application)
                 onFailure = { exception ->
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        errorMessage = exception.message ?: "Error al conectar con la pareja"
+                        errorMessage = exception.message ?: "Error al conectar con el otro jugador"
                     )
                 }
             )
